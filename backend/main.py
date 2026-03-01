@@ -29,8 +29,10 @@ async def create_agent(**kwargs) -> Agent:
         edge=getstream.Edge(),
         agent_user=User(name="StepRoast AI", id="steproast-agent"),
         instructions="Read @steproast_judge.md",
-        llm=gemini.Realtime(fps=10),
-        processors=[footwork],
+        llm=gemini.Realtime(fps=5),
+        # YOLO disabled — CPU-only Codespace can't handle 30 FPS inference
+        # Gemini Realtime sees the raw video directly and judges visually
+        processors=[],
         stt=deepgram.STT(),
         tts=elevenlabs.TTS(),
     )

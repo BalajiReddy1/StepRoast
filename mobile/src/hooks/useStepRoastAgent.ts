@@ -5,7 +5,7 @@ import {
 } from '@stream-io/video-react-native-sdk';
 
 // Default — will be overridden at runtime via the settings input
-const DEFAULT_BACKEND_URL = 'http://192.168.0.104:8000';
+const DEFAULT_BACKEND_URL = 'https://orange-yodel-gjp6g6q9grr29v4w-8000.app.github.dev';
 
 interface StepRoastState {
     isConnected: boolean;

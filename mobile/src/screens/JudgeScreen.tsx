@@ -34,7 +34,7 @@ interface JudgeScreenProps {
 }
 
 // Default backend URL — your computer's WiFi IP
-const DEFAULT_BACKEND_URL = 'http://192.168.0.104:8000';
+const DEFAULT_BACKEND_URL = 'https://orange-yodel-gjp6g6q9grr29v4w-8000.app.github.dev';
 
 export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
     const [countdown, setCountdown] = useState<number | null>(null);
