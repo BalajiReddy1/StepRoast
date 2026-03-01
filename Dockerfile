@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir uv
 
 # Copy project files
 COPY backend/pyproject.toml backend/uv.lock* ./
+ENV UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 RUN uv sync --no-dev 2>/dev/null || uv sync
 
 COPY backend/ ./
