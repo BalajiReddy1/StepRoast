@@ -87,6 +87,8 @@ class TranscriptInterceptor:
                 fragment = line.split("[Agent transcript]:")[-1]
                 # Strip ANSI escape codes (e.g. \x1b[0m) before storing
                 fragment = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', fragment)
+                # Collapse multiple spaces into single space
+                fragment = re.sub(r'  +', ' ', fragment)
                 transcript.handle_fragment(fragment)
     
     def flush(self):
@@ -126,28 +128,28 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
     call = await agent.create_call(call_type, call_id)
 
     async with agent.join(call):
-        # Opening prompt — directive, not a question
+        # Opening prompt — matches the actual camera setup (front-facing, full body)
         await agent.llm.simple_response(
             text=(
-                "You are FootworkAI Coach. The camera is pointing up from the floor "
-                "showing the dancer's feet and lower legs. "
-                "Describe in one sentence exactly what the feet are doing right now and give your coaching take."
+                "You are FootworkAI Coach watching a dancer through their front-facing camera. "
+                "You can see their full body. Describe what movement you see right now "
+                "and give one coaching sentence."
             )
         )
 
-        # Re-prompt every 5s — directive statements force Gemini to describe what it sees
+        # Re-prompt every 4s with directives about what's visible
         async def keep_roasting():
             prompts = [
-                "Describe the speed and energy of the feet you see right now. Give one coaching sentence.",
-                "Look at the foot rhythm in the video. Give one specific coaching note.",
-                "Observe the step pattern visible in the frame. One coaching sentence.",
-                "Comment on the foot placement and balance you see. One sentence.",
-                "Describe what the ankles are doing and coach it. One sentence.",
-                "Look at how consistently the feet are moving. Give one coaching tip.",
+                "Describe the dance movement you see in the video right now. One coaching sentence.",
+                "How is their body rhythm and energy? One direct coaching sentence.",
+                "Coach the movement quality you see — footwork, arms, body. One sentence.",
+                "Is the dancer keeping rhythm or off-beat? Coach it in one sentence.",
+                "Describe the intensity of the dancing you see. One coaching sentence.",
+                "What should they improve based on what you see right now? One sentence.",
             ]
             i = 0
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(4)  # 4 seconds for snappier feedback
                 try:
                     prompt = prompts[i % len(prompts)]
                     await agent.llm.simple_response(text=prompt)

@@ -322,8 +322,8 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                         <Text style={styles.cameraIcon}>📹</Text>
                         <Text style={styles.idleTitle}>Ready for Coaching</Text>
                         <Text style={styles.idleHint}>
-                            Place your phone on the floor with camera facing up, then hit
-                            start. The AI Coach will give real-time feedback on your footwork!
+                            Prop your phone up or hold it so the camera can see you dancing.
+                            The AI Coach will give real-time feedback on your moves!
                         </Text>
                         <TouchableOpacity
                             style={styles.startButton}
