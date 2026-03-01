@@ -16,8 +16,9 @@ import threading
 from dotenv import load_dotenv
 from vision_agents.core import Agent, AgentLauncher, User, Runner
 from vision_agents.plugins import getstream, gemini, deepgram, elevenlabs
-from processors.footwork_processor import FootworkProcessor
 from getstream import Stream
+from fastapi import Request, HTTPException
+from processors.footwork_processor import FootworkProcessor
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -201,19 +202,18 @@ async def get_token(user_id: str = "mobile-user"):
 
 
 @runner.fast_api.post("/sessions")
-async def create_session(body: dict):
+async def create_session(request: Request):
     """Create a new AI agent session for a call."""
     try:
+        body = await request.json()
         call_id = body.get("call_id")
         call_type = body.get("call_type", "default")
         
         if not call_id:
-            return {"error": "Missing call_id", "session_id": None}
+            logger.error("Missing call_id in session creation")
+            raise HTTPException(status_code=400, detail="Missing call_id")
         
         logger.info(f"Creating session for call: {call_id}")
-        
-        # The Vision Agents Runner handles session creation automatically
-        # This is a simple pass-through that delegates to the runner
         session_id = f"session-{call_id}"
         
         return {
@@ -221,9 +221,11 @@ async def create_session(body: dict):
             "call_id": call_id,
             "call_type": call_type,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Session creation failed: {type(e).__name__}: {e}", exc_info=True)
-        return {"error": str(e), "session_id": None}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @runner.fast_api.delete("/sessions/{session_id}")
@@ -234,7 +236,7 @@ async def delete_session(session_id: str):
         return {"session_id": session_id, "status": "ended"}
     except Exception as e:
         logger.error(f"Session deletion failed: {type(e).__name__}: {e}", exc_info=True)
-        return {"error": str(e), "session_id": session_id}
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @runner.fast_api.get("/metrics")
