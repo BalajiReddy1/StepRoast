@@ -9,7 +9,7 @@
       "visibility": "public"
     }
   },
-  "postCreateCommand": "cd backend && pip install uv && PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu uv sync",
+  "postCreateCommand": "cd backend && pip install uv && uv sync --no-cache",
   "customizations": {
     "vscode": {
       "extensions": [
