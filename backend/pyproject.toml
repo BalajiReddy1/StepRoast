@@ -1,0 +1,11 @@
+[project]
+name = "steproast-backend"
+version = "0.1.0"
+description = "StepRoast — AI footwork judge backend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "vision-agents[deepgram,elevenlabs,gemini,getstream,ultralytics]>=0.3.8",
+    "numpy>=1.26.0",
+]

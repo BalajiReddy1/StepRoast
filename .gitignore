@@ -1,0 +1,78 @@
+# ── Secrets ──
+.env
+backend/.env
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+wheels/
+
+# ── uv lock (regenerated on uv sync) ──
+uv.lock
+
+# ── YOLO model weights (auto-downloaded at runtime, ~6MB) ──
+*.pt
+
+# ── Node / npm ──
+node_modules/
+package-lock.json
+yarn.lock
+
+# ── Expo ──
+.expo/
+web-build/
+expo-env.d.ts
+
+# ── React Native / Android ──
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# ── React Native / iOS ──
+mobile/ios/Pods/
+mobile/ios/build/
+*.xcworkspace
+*.xcuserdata
+
+# ── Kotlin ──
+.kotlin/
+
+# ── Metro bundler ──
+.metro-health-check*
+
+# ── Nested git repos (from init before monorepo) ──
+backend/.git/
+mobile/.git/
+
+# ── OS junk ──
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ── IDE ──
+.idea/
+*.iml
+
+# ── Debug logs ──
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ── Signing keys (never commit) ──
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*

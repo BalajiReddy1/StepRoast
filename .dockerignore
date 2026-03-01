@@ -1,0 +1,27 @@
+# Environment
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Node
+mobile/node_modules/
+mobile/android/build/
+mobile/android/app/build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
