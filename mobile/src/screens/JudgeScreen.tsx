@@ -101,7 +101,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
     // Show errors
     useEffect(() => {
         if (agent.error) {
-            Alert.alert('StepRoast Error', agent.error);
+            Alert.alert('FootworkAI Error', agent.error);
         }
     }, [agent.error]);
 
@@ -110,7 +110,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
         if (!permission?.granted) {
             const result = await requestPermission();
             if (!result.granted) {
-                Alert.alert('Camera Required', 'StepRoast needs camera access to judge your footwork!');
+                Alert.alert('Camera Required', 'FootworkAI needs camera access to analyze your footwork!');
                 return;
             }
         }

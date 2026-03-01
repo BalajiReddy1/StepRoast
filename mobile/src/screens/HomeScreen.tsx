@@ -16,8 +16,8 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
                 {/* Logo / Title */}
-                <Text style={styles.emoji}>🔥</Text>
-                <Text style={styles.title}>StepRoast</Text>
+                <Text style={styles.emoji}>�</Text>
+                <Text style={styles.title}>FootworkAI</Text>
                 <Text style={styles.subtitle}>Real-Time AI Coach</Text>
 
                 {/* Description */}
