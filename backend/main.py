@@ -128,21 +128,21 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
         # Kick-start Gemini with an opening prompt
         await agent.llm.simple_response(
             text=(
-                "You are StepRoast Coach, a fun AI dance coach giving real-time feedback. "
-                "You see someone's feet dancing. Give a 1-sentence hype intro!"
+                "You are StepRoast Coach. Look at the feet right now. "
+                "Give one honest coaching sentence about what you actually see — "
+                "if they're not moving, say so."
             )
         )
 
-        # Keep Gemini coaching by re-prompting every 5 seconds
-        # Short prompts = faster Gemini output = lower latency
+        # Re-prompt Gemini every 5s with observational coaching questions
         async def keep_roasting():
             prompts = [
-                "How's the footwork RIGHT NOW? 1 quick sentence!",
-                "Fast or slow feet? Quick comment!",
-                "Balanced or wobbly? 1 sentence!",
-                "Which foot is leading? React!",
-                "Are they on rhythm? Quick take!",
-                "What do you see the ankles doing? 1 sentence!",
+                "Are the feet moving right now? Give one honest coaching sentence.",
+                "What is the actual speed and rhythm of the feet? One sentence.",
+                "Are they on beat or off? Be direct, one sentence.",
+                "How is the foot placement and balance right now? One sentence.",
+                "Is the footwork improving or staying the same? One honest sentence.",
+                "What specific thing should they fix right now? One sentence.",
             ]
             i = 0
             while True:

@@ -13,7 +13,6 @@ import {
     Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import VibeMeter from '../components/VibeMeter';
 import ScoreCard from '../components/ScoreCard';
 
 interface AgentHook {
@@ -226,9 +225,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                             </View>
                         </View>
 
-                        <VibeMeter level={agent.vibeLevel} />
-
-                        {/* Final score card (appears when AI gives verdict) */}
+                        {/* Final score card (appears when AI gives verdict) */
                         {agent.score !== null && agent.verdict !== null && (
                             <ScoreCard score={agent.score} verdict={agent.verdict} />
                         )}
@@ -242,7 +239,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                 {/* Farewell screen — shows roast after stopping */}
                 {farewellMode && !agent.isJudging && (
                     <View style={styles.farewellContent}>
-                        <Text style={styles.farewellIcon}>🎤💀</Text>
+                        <Text style={styles.farewellIcon}>🎤</Text>
                         <Text style={styles.farewellTitle}>SESSION OVER</Text>
                         <View style={styles.farewellBox}>
                             <Text style={styles.farewellText}>
