@@ -341,7 +341,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0a0a0a',
+        backgroundColor: '#000',
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     cameraFill: {
@@ -667,19 +667,22 @@ const styles = StyleSheet.create({
     },
     startButton: {
         backgroundColor: '#e94560',
-        paddingHorizontal: 48,
-        paddingVertical: 18,
-        borderRadius: 30,
+        paddingHorizontal: 56,
+        paddingVertical: 20,
+        borderRadius: 35,
         shadowColor: '#e94560',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.5,
+        shadowRadius: 16,
+        elevation: 12,
+        borderWidth: 2,
+        borderColor: '#ff5577',
     },
     startButtonText: {
         fontSize: 22,
-        fontWeight: '800',
+        fontWeight: '900',
         color: '#fff',
-        letterSpacing: 2,
+        letterSpacing: 3,
+        textTransform: 'uppercase',
     },
 });
