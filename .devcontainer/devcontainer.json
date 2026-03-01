@@ -1,7 +1,6 @@
 {
   "name": "StepRoast Backend",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "workspaceFolder": "/workspace",
   "forwardPorts": [8000],
   "portsAttributes": {
     "8000": {
