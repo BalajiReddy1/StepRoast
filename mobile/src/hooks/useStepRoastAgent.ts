@@ -31,8 +31,8 @@ interface MetricsResponse {
     frame_count: number;
     persons_detected: number;
     summary: string;
-    commentary: string;
-    all_commentary: string[];
+    commentary?: string;
+    all_commentary?: string[];
 }
 
 /**
@@ -71,7 +71,7 @@ export function useStepRoastAgent() {
         };
     }, []);
 
-    // ── Poll /metrics for vibe meter + step count ──────────────────────
+    // ── Poll /metrics for vibe meter + step count + AI commentary ─────
     const startMetricsPolling = useCallback((url: string) => {
         if (metricsIntervalRef.current) clearInterval(metricsIntervalRef.current);
         metricsIntervalRef.current = setInterval(async () => {
@@ -79,17 +79,21 @@ export function useStepRoastAgent() {
                 const res = await fetch(`${url}/metrics`);
                 if (!res.ok) return;
                 const data: MetricsResponse = await res.json();
-                setState(prev => ({
-                    ...prev,
-                    vibeLevel: speedToVibe(data.avg_speed),
-                    stepCount: data.step_count,
-                    // Show AI commentary from transcript capture (text fallback)
-                    liveCommentary: data.commentary || prev.liveCommentary,
-                }));
+                setState(prev => {
+                    const newCommentary = data.commentary && data.commentary.length > 0
+                        ? `🎤 ${data.commentary}`
+                        : prev.liveCommentary;
+                    return {
+                        ...prev,
+                        vibeLevel: speedToVibe(data.avg_speed),
+                        stepCount: data.step_count,
+                        liveCommentary: newCommentary,
+                    };
+                });
             } catch {
                 // silently ignore — metrics are best-effort
             }
-        }, 1500); // poll every 1.5s
+        }, 1000); // poll every 1s for snappy updates
     }, []);
 
     const stopMetricsPolling = useCallback(() => {
@@ -191,7 +195,10 @@ export function useStepRoastAgent() {
                 liveCommentary: '🔥 StepRoast AI is watching. DANCE!',
             }));
 
-            // Start polling metrics for vibe meter
+            // Reset starting flag — session is live now
+            isStartingRef.current = false;
+
+            // Start polling metrics for vibe meter + AI commentary
             startMetricsPolling(url);
 
             // Listen for custom events from the agent (text commentary)

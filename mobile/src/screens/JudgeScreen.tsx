@@ -193,16 +193,21 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                         contentContainerStyle={styles.judgingOverlay}
                         showsVerticalScrollIndicator={false}
                     >
-                        {/* Live commentary bubble */}
-                        {agent.liveCommentary && (
-                            <View style={styles.commentaryBox}>
-                                <Text style={styles.commentaryText}>{agent.liveCommentary}</Text>
-                            </View>
-                        )}
+                        {/* Live AI commentary bubble */}
+                        <View style={styles.commentaryBox}>
+                            <Text style={styles.commentaryText}>
+                                {agent.liveCommentary || '🤖 Waiting for AI...'}
+                            </Text>
+                        </View>
 
-                        {/* Step counter */}
-                        <View style={styles.stepCounter}>
-                            <Text style={styles.stepCountText}>👟 {agent.stepCount} steps</Text>
+                        {/* Stats row */}
+                        <View style={styles.statsRow}>
+                            <View style={styles.stepCounter}>
+                                <Text style={styles.stepCountText}>👟 {agent.stepCount} steps</Text>
+                            </View>
+                            <View style={styles.stepCounter}>
+                                <Text style={styles.stepCountText}>⏱ {formatTime(elapsed)}</Text>
+                            </View>
                         </View>
 
                         <VibeMeter level={agent.vibeLevel} />
@@ -356,19 +361,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     commentaryBox: {
-        backgroundColor: 'rgba(26, 26, 46, 0.9)',
+        backgroundColor: 'rgba(26, 26, 46, 0.95)',
         borderRadius: 16,
         padding: 20,
-        marginBottom: 20,
+        marginBottom: 16,
         borderLeftWidth: 4,
         borderLeftColor: '#e94560',
         width: '100%',
+        minHeight: 60,
     },
     commentaryText: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: 20,
+        fontWeight: '700',
         textAlign: 'center',
+        lineHeight: 28,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 12,
     },
     stepCounter: {
         backgroundColor: 'rgba(26, 26, 46, 0.85)',
