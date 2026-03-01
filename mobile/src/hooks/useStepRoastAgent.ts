@@ -79,6 +79,7 @@ export function useStepRoastAgent() {
     // Accumulate chat fragments into complete sentences
     const chatBufferRef = useRef<string>('');
     const lastCompleteRef = useRef<string>('');
+    const lastMetricsCommentaryRef = useRef<string>('');
 
     // Cleanup on unmount
     useEffect(() => {
@@ -100,24 +101,23 @@ export function useStepRoastAgent() {
                 if (!res.ok) return;
                 const data: MetricsResponse = await res.json();
                 
-                // DEBUG: log what we're getting
-                console.log('[METRICS]', JSON.stringify({ commentary: data.commentary, all: data.all_commentary?.length }));
-                
                 setState(prev => {
-                    const newCommentary = data.commentary && data.commentary.length > 0
-                        ? `🎤 ${data.commentary}`
-                        : prev.liveCommentary;
+                    // Only update commentary if it actually changed
+                    const rawCommentary = data.commentary || '';
+                    const commentaryChanged = rawCommentary.length > 0 && rawCommentary !== lastMetricsCommentaryRef.current;
                     
-                    // DEBUG: log state update
-                    if (newCommentary !== prev.liveCommentary) {
-                        console.log('[STATE UPDATE] liveCommentary:', newCommentary);
+                    if (commentaryChanged) {
+                        lastMetricsCommentaryRef.current = rawCommentary;
+                        console.log('[METRICS] New commentary:', rawCommentary.slice(0, 60));
                     }
                     
                     return {
                         ...prev,
                         vibeLevel: speedToVibe(data.avg_speed),
                         stepCount: data.step_count,
-                        liveCommentary: newCommentary,
+                        liveCommentary: commentaryChanged
+                            ? `🎤 ${rawCommentary}`
+                            : prev.liveCommentary,
                     };
                 });
             } catch {
@@ -380,6 +380,7 @@ export function useStepRoastAgent() {
             // Reset chat buffer
             chatBufferRef.current = '';
             lastCompleteRef.current = '';
+            lastMetricsCommentaryRef.current = '';
 
             // Leave the call
             if (callRef.current) {

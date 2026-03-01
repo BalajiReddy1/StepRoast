@@ -11,6 +11,7 @@ Architecture:
 
 import os
 import re
+import time
 import asyncio
 import logging
 import threading
@@ -36,6 +37,8 @@ class TranscriptCapture:
         self.current_sentence = ""
         self.latest_complete = ""
         self.all_commentary: list[str] = []
+        self._version = 0
+        self._last_update = 0.0
 
     def handle_fragment(self, fragment: str):
         """Process a single transcript fragment."""
@@ -49,6 +52,8 @@ class TranscriptCapture:
                 if len(self.all_commentary) > 50:
                     self.all_commentary = self.all_commentary[-50:]
                 self.current_sentence = ""
+                self._version += 1
+                self._last_update = time.time()
 
     def get_latest(self) -> str:
         with self._lock:
@@ -63,6 +68,13 @@ class TranscriptCapture:
             self.current_sentence = ""
             self.latest_complete = ""
             self.all_commentary.clear()
+            self._version = 0
+            self._last_update = 0.0
+
+    @property
+    def version(self) -> int:
+        with self._lock:
+            return self._version
 
 
 transcript = TranscriptCapture()
@@ -148,19 +160,28 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
                 "What has improved or changed since you last looked? One sentence.",
             ]
             i = 0
+            consecutive_failures = 0
             while True:
-                await asyncio.sleep(4)  # 4 seconds for snappier feedback
+                await asyncio.sleep(4)
                 try:
                     prompt = prompts[i % len(prompts)]
                     await agent.llm.simple_response(text=prompt)
                     i += 1
+                    consecutive_failures = 0
                 except Exception as e:
-                    logger.warning(f"Re-prompt failed: {e}")
-                    break
+                    consecutive_failures += 1
+                    logger.warning(f"Re-prompt failed ({consecutive_failures}/5): {e}")
+                    if consecutive_failures >= 5:
+                        logger.error("Too many consecutive re-prompt failures, stopping loop")
+                        break
+                    await asyncio.sleep(2)  # back off before retry
 
         roast_task = asyncio.create_task(keep_roasting())
         try:
-            await agent.finish()
+            # 5-minute max session — prevents infinite hangs if mobile disconnects
+            await asyncio.wait_for(agent.finish(), timeout=300)
+        except asyncio.TimeoutError:
+            logger.warning("Session timed out after 5 minutes")
         finally:
             roast_task.cancel()
             try:
@@ -320,6 +341,7 @@ async def get_metrics():
         "summary": footwork.get_metrics_text(),
         # Live AI commentary captured from agent transcripts
         "commentary": transcript.get_latest(),
+        "commentary_version": transcript.version,
         "all_commentary": transcript.get_all(),
     }
 
