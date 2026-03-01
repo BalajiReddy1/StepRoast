@@ -37,7 +37,9 @@ class FootworkProcessor(YOLOPoseProcessor):
             conf_threshold=0.5,
             **kwargs,
         )
-        # Tracking state
+        self._init_state()
+
+    def _init_state(self):
         self.prev_left_ankle = None
         self.prev_right_ankle = None
         self.step_count = 0
@@ -45,6 +47,10 @@ class FootworkProcessor(YOLOPoseProcessor):
         self.frame_count = 0
         self.current_speed = 0.0
         self.persons_detected = 0
+
+    def reset(self):
+        """Reset all metrics for a new session."""
+        self._init_state()
 
     # ------------------------------------------------------------------
     # Helpers
