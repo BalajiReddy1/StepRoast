@@ -128,21 +128,21 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
         # Kick-start Gemini with an opening prompt
         await agent.llm.simple_response(
             text=(
-                "You are StepRoast Coach. Look at the feet right now. "
-                "Give one honest coaching sentence about what you actually see — "
-                "if they're not moving, say so."
+                "You are StepRoast Coach. The camera is pointing up from the floor — you see feet and lower legs. "
+                "Look at what the feet are doing RIGHT NOW and give one sharp coaching sentence. "
+                "If they are actively moving, coach the quality. If they are still, tell them to start."
             )
         )
 
-        # Re-prompt Gemini every 5s with observational coaching questions
+        # Re-prompt Gemini every 5s with varied coaching angles
         async def keep_roasting():
             prompts = [
-                "Are the feet moving right now? Give one honest coaching sentence.",
-                "What is the actual speed and rhythm of the feet? One sentence.",
-                "Are they on beat or off? Be direct, one sentence.",
-                "How is the foot placement and balance right now? One sentence.",
-                "Is the footwork improving or staying the same? One honest sentence.",
-                "What specific thing should they fix right now? One sentence.",
+                "Coach the footwork you see right now. One sentence, specific and direct.",
+                "What is the energy level of the feet? Give one coaching tip.",
+                "Look at the foot placement. One coaching sentence.",
+                "Comment on the speed and sharpness of the steps. One sentence.",
+                "What should they focus on improving right now? One coaching sentence.",
+                "React to the footwork pattern you see. One direct sentence.",
             ]
             i = 0
             while True:
@@ -240,6 +240,67 @@ async def delete_session(session_id: str):
     except Exception as e:
         logger.error(f"Session deletion failed: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@runner.fast_api.get("/verdict")
+async def get_verdict():
+    """Return a final score breakdown + improvement tips based on session metrics."""
+    import numpy as np
+    avg_speed = float(np.mean(footwork.speed_history)) if footwork.speed_history else 0.0
+    peak_speed = float(np.max(footwork.speed_history)) if footwork.speed_history else 0.0
+    step_count = footwork.step_count
+
+    # Score each category 0–25
+    speed_score = min(25, int((avg_speed / 25) * 25))
+
+    if len(footwork.speed_history) > 10 and avg_speed > 3:
+        std = float(np.std(footwork.speed_history))
+        consistency = max(0.0, 1.0 - (std / (avg_speed + 1)))
+        rhythm_score = min(25, int(consistency * 25))
+    else:
+        rhythm_score = 0
+
+    if avg_speed > 3 and peak_speed > 0:
+        variety = min(1.0, (peak_speed - avg_speed) / (avg_speed + 1))
+        complexity_score = min(25, int(variety * 15 + min(step_count / 10, 10)))
+    else:
+        complexity_score = 0
+
+    commitment_score = min(25, int(min(step_count / 4, 25)))
+    total = speed_score + rhythm_score + complexity_score + commitment_score
+
+    tips = []
+    if speed_score < 8:
+        tips.append("Work on faster, snappier foot movements")
+    if rhythm_score < 8:
+        tips.append("Focus on staying consistent — pick a beat and stick to it")
+    if complexity_score < 8:
+        tips.append("Try more varied footwork patterns and combinations")
+    if commitment_score < 8:
+        tips.append("Stay active throughout — don't pause, keep the feet moving")
+    if not tips:
+        tips = ["Push for even more speed", "Try faster tempo music next time"]
+
+    highlights = transcript.get_all()
+    # Pick last 3 non-empty highlights
+    highlights = [h for h in highlights if h.strip()][-3:]
+
+    return {
+        "total_score": total,
+        "breakdown": {
+            "speed": speed_score,
+            "rhythm": rhythm_score,
+            "complexity": complexity_score,
+            "commitment": commitment_score,
+        },
+        "tips": tips[:3],
+        "stats": {
+            "step_count": step_count,
+            "avg_speed": round(avg_speed, 1),
+            "peak_speed": round(peak_speed, 1),
+        },
+        "highlights": highlights,
+    }
 
 
 @runner.fast_api.get("/metrics")

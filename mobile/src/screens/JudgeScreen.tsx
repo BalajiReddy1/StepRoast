@@ -15,6 +15,14 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import ScoreCard from '../components/ScoreCard';
 
+interface FinalVerdict {
+    total_score: number;
+    breakdown: { speed: number; rhythm: number; complexity: number; commitment: number };
+    tips: string[];
+    stats: { step_count: number; avg_speed: number; peak_speed: number };
+    highlights: string[];
+}
+
 interface AgentHook {
     isConnected: boolean;
     isJudging: boolean;
@@ -24,6 +32,7 @@ interface AgentHook {
     liveCommentary: string | null;
     error: string | null;
     stepCount: number;
+    finalVerdict: FinalVerdict | null;
     connect: (backendUrl: string) => Promise<any>;
     startJudging: (backendUrl: string) => Promise<void>;
     stopJudging: (backendUrl: string) => Promise<void>;
@@ -80,16 +89,11 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
         }
     }, [agent.isJudging]);
 
-    // Detect when judging stops → show farewell screen for 4 seconds
+    // Detect when judging stops → show farewell/results screen
     useEffect(() => {
         if (wasJudgingRef.current && !agent.isJudging) {
-            // Just stopped judging — show farewell mode
             setFarewellMode(true);
-            const timeout = setTimeout(() => {
-                setFarewellMode(false);
-                setElapsed(0); // Reset timer for next session
-            }, 4000);
-            return () => clearTimeout(timeout);
+            // No auto-dismiss — user taps Done to go back
         }
         wasJudgingRef.current = agent.isJudging;
     }, [agent.isJudging]);
@@ -236,19 +240,80 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                     </ScrollView>
                 )}
 
-                {/* Farewell screen — shows roast after stopping */}
+                {/* Results screen after stopping */}
                 {farewellMode && !agent.isJudging && (
-                    <View style={styles.farewellContent}>
-                        <Text style={styles.farewellIcon}>🎤</Text>
-                        <Text style={styles.farewellTitle}>SESSION OVER</Text>
-                        <View style={styles.farewellBox}>
-                            <Text style={styles.farewellText}>
-                                {agent.liveCommentary || 'Peace out, dancer!'}
-                            </Text>
-                        </View>
+                    <ScrollView
+                        style={{ width: '100%' }}
+                        contentContainerStyle={styles.farewellContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <Text style={styles.farewellTitle}>SESSION COMPLETE</Text>
                         <Text style={styles.farewellTimer}>⏱ {formatTime(elapsed)}</Text>
-                        <Text style={styles.farewellHint}>Returning to menu...</Text>
-                    </View>
+
+                        {/* Score */}
+                        <View style={styles.scoreCircle}>
+                            <Text style={styles.scoreNumber}>
+                                {agent.finalVerdict?.total_score ?? '--'}
+                            </Text>
+                            <Text style={styles.scoreDenom}>/100</Text>
+                        </View>
+
+                        {/* Breakdown */}
+                        {agent.finalVerdict && (
+                            <View style={styles.breakdownCard}>
+                                <Text style={styles.breakdownTitle}>BREAKDOWN</Text>
+                                {([
+                                    { label: '⚡ Speed', key: 'speed' },
+                                    { label: '🎵 Rhythm', key: 'rhythm' },
+                                    { label: '🔥 Complexity', key: 'complexity' },
+                                    { label: '💯 Commitment', key: 'commitment' },
+                                ] as const).map(({ label, key }) => {
+                                    const val = agent.finalVerdict!.breakdown[key];
+                                    const pct = (val / 25) * 100;
+                                    return (
+                                        <View key={key} style={styles.barRow}>
+                                            <Text style={styles.barLabel}>{label}</Text>
+                                            <View style={styles.barTrack}>
+                                                <View style={[styles.barFill, { width: `${pct}%` as any }]} />
+                                            </View>
+                                            <Text style={styles.barScore}>{val}/25</Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {/* Tips */}
+                        {agent.finalVerdict && agent.finalVerdict.tips.length > 0 && (
+                            <View style={styles.tipsCard}>
+                                <Text style={styles.tipsTitle}>HOW TO IMPROVE</Text>
+                                {agent.finalVerdict.tips.map((tip, i) => (
+                                    <Text key={i} style={styles.tipItem}>• {tip}</Text>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Coach highlights */}
+                        {agent.finalVerdict && agent.finalVerdict.highlights.length > 0 && (
+                            <View style={styles.highlightsCard}>
+                                <Text style={styles.tipsTitle}>COACH SAID</Text>
+                                {agent.finalVerdict.highlights.map((h, i) => (
+                                    <Text key={i} style={styles.highlightItem}>"{h}"</Text>
+                                ))}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.doneButton}
+                            onPress={() => {
+                                setFarewellMode(false);
+                                setElapsed(0);
+                                onBack();
+                            }}
+                        >
+                            <Text style={styles.doneButtonText}>DONE</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
                 )}
 
                 {/* Idle state */}
@@ -441,48 +506,142 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 1,
     },
-    // Farewell screen after stopping
+    // Results screen after stopping
     farewellContent: {
         alignItems: 'center',
         paddingHorizontal: 20,
-    },
-    farewellIcon: {
-        fontSize: 64,
-        marginBottom: 16,
-    },
-    farewellTitle: {
-        fontSize: 32,
-        fontWeight: '900',
-        color: '#e94560',
-        marginBottom: 20,
-        letterSpacing: 2,
-    },
-    farewellBox: {
-        backgroundColor: 'rgba(26, 26, 46, 0.95)',
-        borderRadius: 16,
-        padding: 24,
-        marginBottom: 20,
-        borderLeftWidth: 4,
-        borderLeftColor: '#e94560',
+        paddingBottom: 40,
+        paddingTop: 16,
         width: '100%',
     },
-    farewellText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '600',
-        textAlign: 'center',
-        lineHeight: 26,
+    farewellTitle: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#e94560',
+        marginBottom: 4,
+        letterSpacing: 2,
     },
     farewellTimer: {
         color: '#888',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
-        marginBottom: 8,
+        marginBottom: 24,
     },
-    farewellHint: {
-        color: '#666',
+    scoreCircle: {
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        borderWidth: 4,
+        borderColor: '#e94560',
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        marginBottom: 24,
+        backgroundColor: 'rgba(233,69,96,0.1)',
+    },
+    scoreNumber: {
+        fontSize: 52,
+        fontWeight: '900',
+        color: '#fff',
+        lineHeight: 56,
+    },
+    scoreDenom: {
         fontSize: 14,
-        fontStyle: 'italic',
+        color: '#888',
+        fontWeight: '600',
+    },
+    breakdownCard: {
+        width: '100%',
+        backgroundColor: '#1a1a2e',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+    },
+    breakdownTitle: {
+        color: '#888',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 2,
+        marginBottom: 14,
+    },
+    barRow: {
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        marginBottom: 10,
+        gap: 8,
+    },
+    barLabel: {
+        color: '#ccc',
+        fontSize: 13,
+        fontWeight: '600',
+        width: 110,
+    },
+    barTrack: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#2a2a4e',
+        borderRadius: 4,
+        overflow: 'hidden' as const,
+    },
+    barFill: {
+        height: 8,
+        backgroundColor: '#e94560',
+        borderRadius: 4,
+    },
+    barScore: {
+        color: '#aaa',
+        fontSize: 12,
+        fontWeight: '700',
+        width: 32,
+        textAlign: 'right' as const,
+    },
+    tipsCard: {
+        width: '100%',
+        backgroundColor: '#1a1a2e',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: '#e94560',
+    },
+    tipsTitle: {
+        color: '#888',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 2,
+        marginBottom: 10,
+    },
+    tipItem: {
+        color: '#fff',
+        fontSize: 14,
+        lineHeight: 22,
+        marginBottom: 4,
+    },
+    highlightsCard: {
+        width: '100%',
+        backgroundColor: '#1a1a2e',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+    },
+    highlightItem: {
+        color: '#aaa',
+        fontSize: 13,
+        lineHeight: 20,
+        fontStyle: 'italic' as const,
+        marginBottom: 6,
+    },
+    doneButton: {
+        marginTop: 8,
+        backgroundColor: '#e94560',
+        paddingHorizontal: 60,
+        paddingVertical: 16,
+        borderRadius: 30,
+    },
+    doneButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '800',
+        letterSpacing: 2,
     },
     // Idle
     idleContent: {

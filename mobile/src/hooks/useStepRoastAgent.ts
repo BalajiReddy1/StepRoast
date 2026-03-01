@@ -17,6 +17,15 @@ interface StepRoastState {
     liveCommentary: string | null;
     error: string | null;
     stepCount: number;
+    finalVerdict: FinalVerdict | null;
+}
+
+interface FinalVerdict {
+    total_score: number;
+    breakdown: { speed: number; rhythm: number; complexity: number; commitment: number };
+    tips: string[];
+    stats: { step_count: number; avg_speed: number; peak_speed: number };
+    highlights: string[];
 }
 
 interface TokenResponse {
@@ -55,6 +64,7 @@ export function useStepRoastAgent() {
         liveCommentary: null,
         error: null,
         stepCount: 0,
+        finalVerdict: null,
     });
 
     const clientRef = useRef<StreamVideoClient | null>(null);
@@ -325,32 +335,26 @@ export function useStepRoastAgent() {
     }, [connect, startMetricsPolling]);
 
     // ── Stop coaching ───────────────────────────────────────────────────
-    const FAREWELL_MESSAGES = [
-        "Great session! Those feet are getting sharper. See you next time! 💪",
-        "Nice work! Keep practicing and you'll be unstoppable. 🔥",
-        "Session complete! Remember: every pro started as a beginner. Keep going! 🌟",
-        "That's a wrap! Your footwork is improving — I can tell. 👏",
-        "Good effort today! Come back tomorrow and let's level up. 📈",
-        "See you next time! Those ankles have potential. 🎯",
-        "Session ended. Keep that energy and practice makes perfect! ⚡",
-        "Until next time! The floor felt that workout. 💯",
-    ];
-
     const stopJudging = useCallback(async (backendUrl: string) => {
         try {
             stopMetricsPolling();
             isStartingRef.current = false;
 
-            // Show farewell message immediately
-            const farewellMsg = FAREWELL_MESSAGES[Math.floor(Math.random() * FAREWELL_MESSAGES.length)];
-            setState(prev => ({
-                ...prev,
-                liveCommentary: `🎤 ${farewellMsg}`,
-            }));
+            const url = backendUrl || backendUrlRef.current;
+
+            // Fetch final verdict score before disconnecting
+            let fetchedVerdict: FinalVerdict | null = null;
+            try {
+                const verdictRes = await fetch(`${url}/verdict`);
+                if (verdictRes.ok) {
+                    fetchedVerdict = await verdictRes.json();
+                }
+            } catch (e) {
+                console.warn('[VERDICT] Failed to fetch verdict:', e);
+            }
 
             // End the agent session on backend
             if (sessionIdRef.current) {
-                const url = backendUrl || backendUrlRef.current;
                 console.log('[STOP] Deleting session:', sessionIdRef.current);
                 try {
                     const res = await fetch(`${url}/sessions/${sessionIdRef.current}`, {
@@ -383,10 +387,11 @@ export function useStepRoastAgent() {
                 callRef.current = null;
             }
 
-            // Keep farewell showing, but mark as not judging
+            // Mark session ended, store verdict
             setState(prev => ({
                 ...prev,
                 isJudging: false,
+                finalVerdict: fetchedVerdict,
             }));
         } catch (err: any) {
             setState(prev => ({ ...prev, isJudging: false, error: err.message }));
