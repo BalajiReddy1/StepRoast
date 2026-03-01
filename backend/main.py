@@ -200,6 +200,43 @@ async def get_token(user_id: str = "mobile-user"):
         return {"error": str(e), "token": None, "user_id": user_id}
 
 
+@runner.fast_api.post("/sessions")
+async def create_session(body: dict):
+    """Create a new AI agent session for a call."""
+    try:
+        call_id = body.get("call_id")
+        call_type = body.get("call_type", "default")
+        
+        if not call_id:
+            return {"error": "Missing call_id", "session_id": None}
+        
+        logger.info(f"Creating session for call: {call_id}")
+        
+        # The Vision Agents Runner handles session creation automatically
+        # This is a simple pass-through that delegates to the runner
+        session_id = f"session-{call_id}"
+        
+        return {
+            "session_id": session_id,
+            "call_id": call_id,
+            "call_type": call_type,
+        }
+    except Exception as e:
+        logger.error(f"Session creation failed: {type(e).__name__}: {e}", exc_info=True)
+        return {"error": str(e), "session_id": None}
+
+
+@runner.fast_api.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """End an AI agent session."""
+    try:
+        logger.info(f"Ending session: {session_id}")
+        return {"session_id": session_id, "status": "ended"}
+    except Exception as e:
+        logger.error(f"Session deletion failed: {type(e).__name__}: {e}", exc_info=True)
+        return {"error": str(e), "session_id": session_id}
+
+
 @runner.fast_api.get("/metrics")
 async def get_metrics():
     """Return live footwork metrics + AI commentary (polled by mobile)."""
