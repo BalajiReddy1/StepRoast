@@ -31,6 +31,8 @@ interface MetricsResponse {
     frame_count: number;
     persons_detected: number;
     summary: string;
+    commentary: string;
+    all_commentary: string[];
 }
 
 /**
@@ -81,6 +83,8 @@ export function useStepRoastAgent() {
                     ...prev,
                     vibeLevel: speedToVibe(data.avg_speed),
                     stepCount: data.step_count,
+                    // Show AI commentary from transcript capture (text fallback)
+                    liveCommentary: data.commentary || prev.liveCommentary,
                 }));
             } catch {
                 // silently ignore — metrics are best-effort

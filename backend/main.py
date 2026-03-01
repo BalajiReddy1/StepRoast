@@ -3,12 +3,15 @@ StepRoast AI — Real-time footwork judge backend.
 
 Architecture:
   Mobile app → Stream SFU ← AI Agent (this server)
-  The agent watches the dancer's video, runs YOLO pose detection,
+  The agent watches the dancer's video via Gemini Realtime,
   and sends live audio roasts + text commentary back.
+  Text commentary is also relayed via /metrics HTTP polling
+  as a fallback when WebRTC audio publisher is unstable.
 """
 
 import os
 import logging
+import threading
 from dotenv import load_dotenv
 from vision_agents.core import Agent, AgentLauncher, User, Runner
 from vision_agents.plugins import getstream, gemini, deepgram, elevenlabs
@@ -19,7 +22,55 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# ── Shared processor instance so we can read metrics from the /token route ──
+
+# ── Transcript capture — intercepts agent transcript log lines ──────────
+class TranscriptCapture(logging.Handler):
+    """Captures agent transcript fragments from the SDK logger and
+    accumulates them into complete sentences for display on mobile."""
+
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+        self.current_sentence = ""
+        self.latest_complete = ""
+        self.all_commentary: list[str] = []
+
+    def emit(self, record):
+        msg = record.getMessage()
+        if "[Agent transcript]:" not in msg:
+            return
+        fragment = msg.split("[Agent transcript]:")[-1]
+        with self._lock:
+            self.current_sentence += fragment
+            stripped = self.current_sentence.strip()
+            # Sentence-ending punctuation → flush
+            if stripped and stripped[-1] in ".!?":
+                self.latest_complete = stripped
+                self.all_commentary.append(stripped)
+                if len(self.all_commentary) > 30:
+                    self.all_commentary = self.all_commentary[-30:]
+                self.current_sentence = ""
+
+    def get_latest(self) -> str:
+        with self._lock:
+            # Return in-progress sentence if nothing complete yet
+            return self.latest_complete or self.current_sentence.strip()
+
+    def get_all(self) -> list[str]:
+        with self._lock:
+            return list(self.all_commentary)
+
+    def reset(self):
+        with self._lock:
+            self.current_sentence = ""
+            self.latest_complete = ""
+            self.all_commentary.clear()
+
+
+transcript = TranscriptCapture()
+logging.getLogger().addHandler(transcript)
+
+# ── Shared processor instance ───────────────────────────────────────────
 footwork = FootworkProcessor()
 
 
@@ -41,6 +92,9 @@ async def create_agent(**kwargs) -> Agent:
 
 async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> None:
     """Called when a mobile user spawns a session — agent joins the call."""
+    # Reset transcript capture for the new session
+    transcript.reset()
+
     await agent.create_user()
     call = await agent.create_call(call_type, call_id)
 
@@ -84,7 +138,7 @@ async def get_token(user_id: str = "mobile-user"):
 
 @runner.fast_api.get("/metrics")
 async def get_metrics():
-    """Return live footwork metrics (polled by mobile for vibe meter)."""
+    """Return live footwork metrics + AI commentary (polled by mobile)."""
     return {
         "step_count": footwork.step_count,
         "avg_speed": float(
@@ -94,6 +148,9 @@ async def get_metrics():
         "frame_count": footwork.frame_count,
         "persons_detected": footwork.persons_detected,
         "summary": footwork.get_metrics_text(),
+        # Live AI commentary captured from agent transcripts
+        "commentary": transcript.get_latest(),
+        "all_commentary": transcript.get_all(),
     }
 
 
