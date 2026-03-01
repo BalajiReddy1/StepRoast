@@ -19,7 +19,7 @@ interface FinalVerdict {
     total_score: number;
     breakdown: { speed: number; rhythm: number; complexity: number; commitment: number };
     tips: string[];
-    stats: { step_count: number; avg_speed: number; peak_speed: number };
+    stats: { total_feedback: number; positive_mentions: number; session_quality: string };
     highlights: string[];
 }
 

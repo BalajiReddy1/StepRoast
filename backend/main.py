@@ -272,42 +272,57 @@ async def delete_session(session_id: str):
 
 @runner.fast_api.get("/verdict")
 async def get_verdict():
-    """Return a final score breakdown + improvement tips based on session metrics."""
-    import numpy as np
-    avg_speed = float(np.mean(footwork.speed_history)) if footwork.speed_history else 0.0
-    peak_speed = float(np.max(footwork.speed_history)) if footwork.speed_history else 0.0
-    step_count = footwork.step_count
-
-    # Score each category 0–25
-    speed_score = min(25, int((avg_speed / 25) * 25))
-
-    if len(footwork.speed_history) > 10 and avg_speed > 3:
-        std = float(np.std(footwork.speed_history))
-        consistency = max(0.0, 1.0 - (std / (avg_speed + 1)))
-        rhythm_score = min(25, int(consistency * 25))
-    else:
-        rhythm_score = 0
-
-    if avg_speed > 3 and peak_speed > 0:
-        variety = min(1.0, (peak_speed - avg_speed) / (avg_speed + 1))
-        complexity_score = min(25, int(variety * 15 + min(step_count / 10, 10)))
-    else:
-        complexity_score = 0
-
-    commitment_score = min(25, int(min(step_count / 4, 25)))
+    """Return a final score breakdown + improvement tips based on AI commentary."""
+    commentary = transcript.get_all()
+    commentary_text = " ".join(commentary).lower()
+    
+    # Analyze keywords in the AI's commentary to generate score
+    positive_keywords = ["fast", "sharp", "electric", "synced", "rhythm", "high", "quick", 
+                        "dynamic", "engaged", "perfect", "driving", "dominating", "intense"]
+    neutral_keywords = ["standing", "still", "slow", "minimal", "needs"]
+    
+    positive_count = sum(1 for word in positive_keywords if word in commentary_text)
+    neutral_count = sum(1 for word in neutral_keywords if word in commentary_text)
+    total_comments = len(commentary)
+    
+    # Each category 0-25
+    # Speed: based on "fast", "quick", "tempo" mentions
+    speed_indicators = ["fast", "quick", "tempo", "rapid"]
+    speed_score = min(25, sum(3 for word in speed_indicators if word in commentary_text))
+    
+    # Rhythm: based on "rhythm", "synced", "beat" mentions
+    rhythm_indicators = ["rhythm", "synced", "beat", "timing"]
+    rhythm_score = min(25, sum(4 for word in rhythm_indicators if word in commentary_text))
+    
+    # Complexity: based on "dynamic", "sharp", "pattern", "movement" variety
+    complexity_indicators = ["dynamic", "sharp", "pattern", "isolation", "switching"]
+    complexity_score = min(25, sum(3 for word in complexity_indicators if word in commentary_text))
+    
+    # Commitment: based on total positive commentary + "energy", "engaged", "high"
+    commitment_indicators = ["energy", "engaged", "intensity", "momentum", "full body"]
+    commitment_score = min(25, sum(3 for word in commitment_indicators if word in commentary_text))
+    
+    # Boost all scores if lots of positive commentary
+    if total_comments > 8:
+        boost = min(5, total_comments - 8)
+        speed_score = min(25, speed_score + boost)
+        rhythm_score = min(25, rhythm_score + boost)
+        complexity_score = min(25, complexity_score + boost)
+        commitment_score = min(25, commitment_score + boost)
+    
     total = speed_score + rhythm_score + complexity_score + commitment_score
 
     tips = []
-    if speed_score < 8:
-        tips.append("Work on faster, snappier foot movements")
-    if rhythm_score < 8:
-        tips.append("Focus on staying consistent — pick a beat and stick to it")
-    if complexity_score < 8:
-        tips.append("Try more varied footwork patterns and combinations")
-    if commitment_score < 8:
-        tips.append("Stay active throughout — don't pause, keep the feet moving")
+    if speed_score < 10:
+        tips.append("Work on faster, snappier movements")
+    if rhythm_score < 10:
+        tips.append("Focus on staying on rhythm — find the beat")
+    if complexity_score < 10:
+        tips.append("Try more varied patterns and dynamic movement")
+    if commitment_score < 10:
+        tips.append("Bring more energy — commit fully to each move")
     if not tips:
-        tips = ["Push for even more speed", "Try faster tempo music next time"]
+        tips = ["Push for even more intensity", "Try faster tempo music next time"]
 
     highlights = transcript.get_all()
     # Pick last 3 non-empty highlights
@@ -323,9 +338,9 @@ async def get_verdict():
         },
         "tips": tips[:3],
         "stats": {
-            "step_count": step_count,
-            "avg_speed": round(avg_speed, 1),
-            "peak_speed": round(peak_speed, 1),
+            "total_feedback": total_comments,
+            "positive_mentions": positive_count,
+            "session_quality": "High" if total_comments > 10 else "Medium" if total_comments > 5 else "Short",
         },
         "highlights": highlights,
     }
