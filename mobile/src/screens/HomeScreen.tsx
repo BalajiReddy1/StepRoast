@@ -5,7 +5,6 @@ import {
     StyleSheet,
     TouchableOpacity,
     SafeAreaView,
-    Image,
 } from 'react-native';
 
 interface HomeScreenProps {
@@ -17,11 +16,7 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
                 {/* Logo / Title */}
-                <Image 
-                    source={require('../../assets/logo.png')} 
-                    style={styles.logo}
-                    resizeMode="contain"
-                />
+                <Text style={styles.emoji}>�</Text>
                 <Text style={styles.title}>FootworkAI</Text>
                 <Text style={styles.subtitle}>Real-Time AI Coach</Text>
 
@@ -44,7 +39,7 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
 
                 {/* Start Button */}
                 <TouchableOpacity style={styles.startButton} onPress={onStart}>
-                    <Text style={styles.startButtonText}>🎤 START</Text>
+                    <Text style={styles.startButtonText}>🎤 START COACHING</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -54,7 +49,7 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: '#0a0a0a',
     },
     content: {
         flex: 1,
@@ -62,10 +57,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 32,
     },
-    logo: {
-        width: 120,
-        height: 120,
-        marginBottom: 16,
+    emoji: {
+        fontSize: 72,
+        marginBottom: 8,
     },
     title: {
         fontSize: 48,
@@ -114,22 +108,19 @@ const styles = StyleSheet.create({
     startButton: {
         marginTop: 40,
         backgroundColor: '#e94560',
-        paddingHorizontal: 56,
-        paddingVertical: 20,
-        borderRadius: 35,
+        paddingHorizontal: 48,
+        paddingVertical: 18,
+        borderRadius: 30,
         shadowColor: '#e94560',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-        elevation: 12,
-        borderWidth: 2,
-        borderColor: '#ff5577',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 8,
     },
     startButtonText: {
-        fontSize: 22,
-        fontWeight: '900',
+        fontSize: 20,
+        fontWeight: '800',
         color: '#fff',
-        letterSpacing: 3,
-        textTransform: 'uppercase',
+        letterSpacing: 2,
     },
 });
