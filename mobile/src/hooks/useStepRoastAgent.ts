@@ -145,7 +145,7 @@ export function useStepRoastAgent() {
             await call.join({ create: true });
             callRef.current = call;
 
-            // Show camera immediately
+            // Show camera immediately — no waiting
             setState(prev => ({
                 ...prev,
                 isJudging: true,
@@ -153,17 +153,19 @@ export function useStepRoastAgent() {
                 verdict: null,
                 vibeLevel: 0,
                 stepCount: 0,
-                liveCommentary: '📡 Warming up connection...',
+                liveCommentary: '🎥 Camera is live!',
             }));
 
-            // Enable camera + mic
-            await call.camera.enable();
-            await call.microphone.enable();
-
-            // Wait for WebRTC to stabilize
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Enable camera + mic in parallel
+            await Promise.all([
+                call.camera.enable(),
+                call.microphone.enable(),
+            ]);
 
             setState(prev => ({ ...prev, liveCommentary: '🤖 Summoning the AI judge...' }));
+
+            // Reduced stabilization wait (agent-side handles its own delay)
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             // Spawn the AI agent into this call
             const sessionRes = await fetch(`${url}/sessions`, {

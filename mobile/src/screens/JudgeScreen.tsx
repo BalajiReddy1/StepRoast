@@ -102,8 +102,14 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
             const t = setTimeout(() => setCountdown(countdown - 1), 1000);
             return () => clearTimeout(t);
         } else if (countdown === 0) {
-            setCountdown(null);
-            agent.startJudging(backendUrl);
+            // Show "GO!" for 600ms before starting
+            setCountdown(-1); // -1 = "GO!" state
+        } else if (countdown === -1) {
+            const t = setTimeout(() => {
+                setCountdown(null);
+                agent.startJudging(backendUrl);
+            }, 600);
+            return () => clearTimeout(t);
         }
     }, [countdown]);
 
@@ -171,14 +177,22 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                 {/* Countdown overlay */}
                 {countdown !== null && (
                     <View style={styles.countdownOverlay}>
-                        <Text style={styles.countdownText}>{countdown || 'GO!'}</Text>
-                        <Text style={styles.countdownSub}>Get your feet ready!</Text>
+                        <Text style={styles.countdownText}>
+                            {countdown === -1 ? 'GO!' : countdown === 0 ? 'GO!' : countdown}
+                        </Text>
+                        <Text style={styles.countdownSub}>
+                            {countdown === -1 || countdown === 0 ? '🔥 Let\'s see those feet!' : 'Get your feet ready!'}
+                        </Text>
                     </View>
                 )}
 
                 {/* Judging state — overlay on camera preview */}
                 {agent.isJudging && (
-                    <View style={styles.judgingOverlay}>
+                    <ScrollView
+                        style={styles.judgingOverlayScroll}
+                        contentContainerStyle={styles.judgingOverlay}
+                        showsVerticalScrollIndicator={false}
+                    >
                         {/* Live commentary bubble */}
                         {agent.liveCommentary && (
                             <View style={styles.commentaryBox}>
@@ -201,7 +215,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                         <TouchableOpacity style={styles.stopButton} onPress={stopJudging}>
                             <Text style={styles.stopButtonText}>⏹ STOP SESSION</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
                 )}
 
                 {/* Idle state */}
@@ -328,11 +342,17 @@ const styles = StyleSheet.create({
         marginTop: 16,
     },
     // Judging overlay on camera
-    judgingOverlay: {
+    judgingOverlayScroll: {
         position: 'absolute',
-        bottom: 40,
-        left: 20,
-        right: 20,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        maxHeight: '55%',
+    },
+    judgingOverlay: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+        paddingTop: 8,
         alignItems: 'center',
     },
     commentaryBox: {
