@@ -76,3 +76,5 @@ yarn-error.*
 *.key
 *.mobileprovision
 *.orig.*
+
+summary.md
