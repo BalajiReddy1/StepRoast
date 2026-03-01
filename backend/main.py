@@ -81,17 +81,21 @@ def install_loguru_sink():
                 pass
         
         def _transcript_sink(message):
-            # Use str(message) to get full formatted log line
+            # Get full formatted log line
             msg = str(message)
+            # Check if this is a transcript message
             if "[Agent transcript]:" in msg:
-                # Extract fragment after the marker (keep leading space for word separation!)
+                # Extract fragment after the marker (keep leading space!)
                 fragment = msg.split("[Agent transcript]:")[-1].rstrip('\n')
                 transcript.handle_fragment(fragment)
+                # Debug: print what we captured
+                import sys
+                print(f"[CAPTURED] '{fragment}' → latest='{transcript.get_latest()}'", file=sys.stderr)
         
+        # NO filter — catch ALL logs and check manually inside sink
         _loguru_sink_id = loguru_logger.add(
             _transcript_sink,
-            level="INFO",
-            filter=lambda record: "Agent transcript" in record["message"],
+            level="DEBUG",
         )
         loguru_logger.info("✅ Loguru transcript sink installed")
     except Exception as e:
