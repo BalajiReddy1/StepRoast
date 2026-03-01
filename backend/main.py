@@ -128,24 +128,24 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
     call = await agent.create_call(call_type, call_id)
 
     async with agent.join(call):
-        # Opening prompt — matches the actual camera setup (front-facing, full body)
+        # Opening prompt — observe first, then coach
         await agent.llm.simple_response(
             text=(
-                "You are FootworkAI Coach watching a dancer through their front-facing camera. "
-                "You can see their full body. Describe what movement you see right now "
-                "and give one coaching sentence."
+                "You are FootworkAI Coach watching a dancer through their front camera. "
+                "You can see their full body. Describe what movement you see and "
+                "give one encouraging coaching sentence."
             )
         )
 
-        # Re-prompt every 4s with directives about what's visible
+        # Re-prompt every 4s — directive to describe then coach
         async def keep_roasting():
             prompts = [
-                "Describe the dance movement you see in the video right now. One coaching sentence.",
-                "How is their body rhythm and energy? One direct coaching sentence.",
-                "Coach the movement quality you see — footwork, arms, body. One sentence.",
-                "Is the dancer keeping rhythm or off-beat? Coach it in one sentence.",
-                "Describe the intensity of the dancing you see. One coaching sentence.",
-                "What should they improve based on what you see right now? One sentence.",
+                "Name the body parts that are moving and coach with one sentence.",
+                "Describe the rhythm you see in the dancer's body. One coaching sentence.",
+                "What is the strongest movement you see? Acknowledge it and suggest one thing. One sentence.",
+                "How is the dancer's energy level? Lead with what IS working. One sentence.",
+                "Observe the footwork and body flow. One specific coaching sentence.",
+                "What has improved or changed since you last looked? One sentence.",
             ]
             i = 0
             while True:
