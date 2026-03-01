@@ -64,35 +64,41 @@ class TranscriptCapture:
 
 
 transcript = TranscriptCapture()
+_loguru_sink_id = None  # Track sink ID to avoid duplicates
 
-# Hook into loguru (used by Vision Agents SDK for transcript logs)
-try:
-    from loguru import logger as loguru_logger
 
-    def _loguru_transcript_sink(message):
-        msg = message.record["message"]
-        if "[Agent transcript]:" in msg:
-            fragment = msg.split("[Agent transcript]:")[-1]
-            transcript.handle_fragment(fragment)
-
-    loguru_logger.add(
-        _loguru_transcript_sink,
-        level="INFO",
-        filter=lambda record: "[Agent transcript]:" in record["message"],
-    )
-    logger.info("✅ Loguru transcript capture installed")
-except ImportError:
-    logger.warning("⚠️ Loguru not available, falling back to stdlib logging")
-
-# Also hook stdlib logging as fallback
-class _StdlibTranscriptHandler(logging.Handler):
-    def emit(self, record):
-        msg = record.getMessage()
-        if "[Agent transcript]:" in msg:
-            fragment = msg.split("[Agent transcript]:")[-1]
-            transcript.handle_fragment(fragment)
-
-logging.getLogger().addHandler(_StdlibTranscriptHandler())
+def install_loguru_sink():
+    """Install loguru sink AFTER SDK initializes (call from join_call)."""
+    global _loguru_sink_id
+    try:
+        from loguru import logger as loguru_logger
+        
+        # Remove previous sink if exists
+        if _loguru_sink_id is not None:
+            try:
+                loguru_logger.remove(_loguru_sink_id)
+            except ValueError:
+                pass
+        
+        def _transcript_sink(message):
+            # Use str(message) to get full formatted log line
+            msg = str(message)
+            if "[Agent transcript]:" in msg:
+                # Extract fragment after the marker
+                fragment = msg.split("[Agent transcript]:")[-1].strip()
+                # Remove trailing newline if present
+                if fragment.endswith("\n"):
+                    fragment = fragment[:-1]
+                transcript.handle_fragment(fragment)
+        
+        _loguru_sink_id = loguru_logger.add(
+            _transcript_sink,
+            level="INFO",
+            filter=lambda record: "Agent transcript" in record["message"],
+        )
+        loguru_logger.info("✅ Loguru transcript sink installed")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not install loguru sink: {e}")
 
 
 # ── Shared processor instance ───────────────────────────────────────────
@@ -116,6 +122,9 @@ async def create_agent(**kwargs) -> Agent:
 async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> None:
     """Called when a mobile user spawns a session — agent joins the call."""
     transcript.reset()
+    
+    # Install loguru sink NOW (after SDK has set up its logging)
+    install_loguru_sink()
 
     await agent.create_user()
     call = await agent.create_call(call_type, call_id)
@@ -125,25 +134,25 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
         await agent.llm.simple_response(
             text=(
                 "You are StepRoast, a savage but funny AI dance judge. "
-                "The camera is pointing at the dancer's feet. "
-                "Start with a short hype intro (1 sentence), then keep watching."
+                "You're watching a live video of someone's feet dancing. "
+                "Give a 1-sentence hype intro, then DESCRIBE what you literally see!"
             )
         )
 
-        # Keep Gemini roasting by re-prompting every 8 seconds
-        # (Gemini Realtime uses turn-taking — without this it goes silent)
+        # Keep Gemini roasting by re-prompting every 6 seconds
+        # Prompts force Gemini to describe SPECIFIC things it sees
         async def keep_roasting():
             prompts = [
-                "Look at the dancer's feet RIGHT NOW and give a quick 1-sentence roast or compliment about their current footwork.",
-                "Judge the dancer's current moves. One punchy sentence — be funny!",
-                "What are those feet doing? Quick reaction, 1 sentence max!",
-                "Rate the energy level of the footwork you see right now. One sentence!",
-                "Give a savage but playful comment about the dance moves you're watching.",
-                "Quick! Roast or praise the footwork happening right now. Keep it short!",
+                "DESCRIBE exactly what the feet are doing RIGHT NOW - are they moving left, right, jumping, shuffling? Give a funny 1-sentence reaction to the SPECIFIC movement you see!",
+                "What COLOR are the shoes or socks you see? Are the feet fast or slow right now? One punchy roast about what you're LITERALLY watching!",
+                "Count how many steps you just saw in the last few seconds! Are they on beat or off? React with one savage sentence!",
+                "Is the dancer's weight on their left foot or right foot RIGHT NOW? Roast their balance in one sentence!",
+                "What's the FLOOR look like? Are the feet close together or spread apart? Give a quick funny observation!",
+                "Are those feet ACTUALLY dancing or just standing there? Describe the movement speed and roast it!",
             ]
             i = 0
             while True:
-                await asyncio.sleep(8)
+                await asyncio.sleep(6)  # Slightly faster prompting
                 try:
                     prompt = prompts[i % len(prompts)]
                     await agent.llm.simple_response(text=prompt)
