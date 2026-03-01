@@ -20,9 +20,10 @@ interface StepRoastState {
 }
 
 interface TokenResponse {
-    token: string;
-    user_id: string;
-    api_key: string;
+    token?: string;
+    user_id?: string;
+    api_key?: string;
+    error?: string;
 }
 
 interface MetricsResponse {
@@ -133,6 +134,10 @@ export function useStepRoastAgent() {
             if (!res.ok) throw new Error(`Token request failed: ${res.status}`);
             const data: TokenResponse = await res.json();
 
+            if (data.error || !data.token || !data.api_key || !data.user_id) {
+                throw new Error(`Backend error: ${data.error || 'Missing credentials'}`);
+            }
+
             const client = StreamVideoClient.getOrCreateInstance({
                 apiKey: data.api_key,
                 user: { id: data.user_id, name: 'Dancer' },
@@ -217,7 +222,16 @@ export function useStepRoastAgent() {
             // (Backend posts commentary to Chat channel, not custom events)
             try {
                 const tokenRes = await fetch(`${url}/token?user_id=mobile-dancer`);
+                
+                if (!tokenRes.ok) {
+                    throw new Error(`Token request failed: ${tokenRes.status} ${tokenRes.statusText}`);
+                }
+                
                 const tokenData: TokenResponse = await tokenRes.json();
+                
+                if (tokenData.error || !tokenData.token || !tokenData.api_key || !tokenData.user_id) {
+                    throw new Error(`Backend error: ${tokenData.error || 'Missing token/api_key/user_id'}`);
+                }
                 
                 const chatClient = StreamChat.getInstance(tokenData.api_key);
                 await chatClient.connectUser(

@@ -178,18 +178,25 @@ async def get_token(user_id: str = "mobile-user"):
     """Generate a Stream user token for the mobile app."""
     try:
         api_key = os.getenv("STREAM_API_KEY")
-        if not api_key:
-            return {"error": "STREAM_API_KEY not set", "token": None, "user_id": user_id}
+        api_secret = os.getenv("STREAM_API_SECRET")
         
+        if not api_key or not api_secret:
+            logger.error(f"Missing Stream credentials: api_key={bool(api_key)}, api_secret={bool(api_secret)}")
+            return {"error": "Missing Stream API credentials", "token": None, "user_id": user_id}
+        
+        logger.info(f"Creating Stream user: {user_id}")
         stream_client.create_user(name="Dancer", id=user_id)
+        
+        logger.info(f"Generating Stream token for: {user_id}")
         token = stream_client.create_token(user_id, expiration=3600)
+        
         return {
             "token": token,
             "user_id": user_id,
             "api_key": api_key,
         }
     except Exception as e:
-        logger.error(f"Token generation failed: {e}")
+        logger.error(f"Token generation failed: {type(e).__name__}: {e}", exc_info=True)
         return {"error": str(e), "token": None, "user_id": user_id}
 
 
