@@ -225,7 +225,7 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                             </View>
                         </View>
 
-                        {/* Final score card (appears when AI gives verdict) */
+                        {/* Final score card (appears when AI gives verdict) */}
                         {agent.score !== null && agent.verdict !== null && (
                             <ScoreCard score={agent.score} verdict={agent.verdict} />
                         )}
