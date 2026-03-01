@@ -149,32 +149,36 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
             )
         )
 
-        # Re-prompt every 4s — directive to describe then coach
+        # Re-prompt loop — short punchy prompts, never dies
         async def keep_roasting():
+            await asyncio.sleep(3)  # let opening prompt land first
+
             prompts = [
-                "Name the body parts that are moving and coach with one sentence.",
-                "Describe the rhythm you see in the dancer's body. One coaching sentence.",
-                "What is the strongest movement you see? Acknowledge it and suggest one thing. One sentence.",
-                "How is the dancer's energy level? Lead with what IS working. One sentence.",
-                "Observe the footwork and body flow. One specific coaching sentence.",
-                "What has improved or changed since you last looked? One sentence.",
+                "What's the energy RIGHT NOW? 1 sentence!",
+                "Fast or slow? Quick comment!",
+                "What's moving the most? React!",
+                "On rhythm or off? 1 sentence!",
+                "What stands out? Quick take!",
+                "Full body vibing? 1 sentence!",
             ]
+
             i = 0
-            consecutive_failures = 0
             while True:
-                await asyncio.sleep(4)
-                try:
-                    prompt = prompts[i % len(prompts)]
-                    await agent.llm.simple_response(text=prompt)
-                    i += 1
-                    consecutive_failures = 0
-                except Exception as e:
-                    consecutive_failures += 1
-                    logger.warning(f"Re-prompt failed ({consecutive_failures}/5): {e}")
-                    if consecutive_failures >= 5:
-                        logger.error("Too many consecutive re-prompt failures, stopping loop")
-                        break
-                    await asyncio.sleep(2)  # back off before retry
+                prompt = prompts[i % len(prompts)]
+                i += 1
+
+                # Retry up to 5 times — but loop NEVER dies, just skips failed prompt
+                for attempt in range(5):
+                    try:
+                        await agent.llm.simple_response(text=prompt)
+                        break  # success — move to next prompt
+                    except Exception as e:
+                        logger.warning(f"Re-prompt attempt {attempt + 1}/5 failed: {e}")
+                        if attempt < 4:
+                            await asyncio.sleep(2)
+                        # else: give up this prompt, continue loop
+
+                await asyncio.sleep(4)  # wait before next prompt
 
         roast_task = asyncio.create_task(keep_roasting())
         try:
