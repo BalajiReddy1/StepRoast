@@ -210,12 +210,19 @@ export function useStepRoastAgent() {
                 body: JSON.stringify({ call_id: callId, call_type: 'default' }),
             });
 
+            const sessionRawText = await sessionRes.text();
+            console.log('[SESSION] status:', sessionRes.status, 'body:', sessionRawText);
+
             if (!sessionRes.ok) {
-                const errData = await sessionRes.json().catch(() => ({}));
-                throw new Error(errData.detail || `Session start failed: ${sessionRes.status}`);
+                throw new Error(`Session start failed (${sessionRes.status}): ${sessionRawText.slice(0, 200)}`);
             }
 
-            const sessionData = await sessionRes.json();
+            let sessionData: any = {};
+            try {
+                sessionData = JSON.parse(sessionRawText);
+            } catch {
+                throw new Error(`Session response is not JSON: ${sessionRawText.slice(0, 200)}`);
+            }
             sessionIdRef.current = sessionData.session_id;
 
             // Connect to Stream Chat to receive AI roasts
