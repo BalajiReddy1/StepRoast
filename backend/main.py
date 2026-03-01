@@ -111,7 +111,7 @@ async def create_agent(**kwargs) -> Agent:
         agent_user=User(name="FootworkAI Coach", id="steproast-agent"),
         instructions="Read @steproast_judge.md",
         llm=gemini.Realtime(fps=10),
-        processors=[footwork],
+        processors=[],
         stt=deepgram.STT(),
         tts=elevenlabs.TTS(),
     )
@@ -126,37 +126,30 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
     call = await agent.create_call(call_type, call_id)
 
     async with agent.join(call):
-        # Opening prompt
+        # Opening prompt — directive, not a question
         await agent.llm.simple_response(
             text=(
-                "You are FootworkAI Coach. The camera points up from the floor showing feet and lower legs. "
-                "The dancer is starting their session. Give one sharp, focused coaching sentence — "
-                "tell them what to focus on as they begin."
+                "You are FootworkAI Coach. The camera is pointing up from the floor "
+                "showing the dancer's feet and lower legs. "
+                "Describe in one sentence exactly what the feet are doing right now and give your coaching take."
             )
         )
 
-        # Re-prompt every 5s injecting real YOLO metrics so Gemini has ground truth
+        # Re-prompt every 5s — directive statements force Gemini to describe what it sees
         async def keep_roasting():
-            coaching_angles = [
-                "Comment on the speed and sharpness of these steps.",
-                "Coach the rhythm and consistency of this footwork.",
-                "Focus on foot placement and balance. One sentence.",
-                "What should they fix or push harder on right now?",
-                "React to the energy level shown in these numbers.",
-                "Give one specific tip based on what these metrics show.",
+            prompts = [
+                "Describe the speed and energy of the feet you see right now. Give one coaching sentence.",
+                "Look at the foot rhythm in the video. Give one specific coaching note.",
+                "Observe the step pattern visible in the frame. One coaching sentence.",
+                "Comment on the foot placement and balance you see. One sentence.",
+                "Describe what the ankles are doing and coach it. One sentence.",
+                "Look at how consistently the feet are moving. Give one coaching tip.",
             ]
             i = 0
             while True:
                 await asyncio.sleep(5)
                 try:
-                    metrics = footwork.get_metrics_text()
-                    angle = coaching_angles[i % len(coaching_angles)]
-                    prompt = (
-                        f"LIVE FOOTWORK DATA: {metrics}\n"
-                        f"{angle} "
-                        f"Base your response on these numbers — if speed and steps are low, call it out; "
-                        f"if they are high, acknowledge it. One sentence only."
-                    )
+                    prompt = prompts[i % len(prompts)]
                     await agent.llm.simple_response(text=prompt)
                     i += 1
                 except Exception as e:
