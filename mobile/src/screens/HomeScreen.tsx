@@ -18,14 +18,14 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
                 {/* Logo / Title */}
                 <Text style={styles.emoji}>🔥</Text>
                 <Text style={styles.title}>StepRoast</Text>
-                <Text style={styles.subtitle}>Footwork AI Judge</Text>
+                <Text style={styles.subtitle}>Real-Time AI Coach</Text>
 
                 {/* Description */}
                 <View style={styles.descriptionBox}>
                     <Text style={styles.description}>
                         Put your phone on the floor, point the camera up at your feet, and
-                        DANCE. The AI will judge your footwork in real-time with savage
-                        roasts and a final score.
+                        DANCE. The AI Coach will analyze your footwork in real-time with
+                        instant feedback and encouragement.
                     </Text>
                 </View>
 
@@ -39,7 +39,7 @@ export default function HomeScreen({ onStart }: HomeScreenProps) {
 
                 {/* Start Button */}
                 <TouchableOpacity style={styles.startButton} onPress={onStart}>
-                    <Text style={styles.startButtonText}>🎤 START JUDGING</Text>
+                    <Text style={styles.startButtonText}>🎤 START COACHING</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

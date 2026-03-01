@@ -64,42 +64,35 @@ class TranscriptCapture:
 
 
 transcript = TranscriptCapture()
-_loguru_sink_id = None  # Track sink ID to avoid duplicates
 
 
-def install_loguru_sink():
-    """Install loguru sink AFTER SDK initializes (call from join_call)."""
-    global _loguru_sink_id
-    try:
-        from loguru import logger as loguru_logger
+class TranscriptInterceptor:
+    """Intercepts stderr to capture transcript lines from SDK logs."""
+    
+    def __init__(self, original_stderr):
+        self.original = original_stderr
+        self.buffer = ""
+    
+    def write(self, text):
+        # Always write to original stderr
+        self.original.write(text)
         
-        # Remove previous sink if exists
-        if _loguru_sink_id is not None:
-            try:
-                loguru_logger.remove(_loguru_sink_id)
-            except ValueError:
-                pass
-        
-        def _transcript_sink(message):
-            # Get full formatted log line
-            msg = str(message)
-            # Check if this is a transcript message
-            if "[Agent transcript]:" in msg:
-                # Extract fragment after the marker (keep leading space!)
-                fragment = msg.split("[Agent transcript]:")[-1].rstrip('\n')
+        # Buffer and process line by line
+        self.buffer += text
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            if "[Agent transcript]:" in line:
+                fragment = line.split("[Agent transcript]:")[-1]
                 transcript.handle_fragment(fragment)
-                # Debug: print what we captured
-                import sys
-                print(f"[CAPTURED] '{fragment}' → latest='{transcript.get_latest()}'", file=sys.stderr)
-        
-        # NO filter — catch ALL logs and check manually inside sink
-        _loguru_sink_id = loguru_logger.add(
-            _transcript_sink,
-            level="DEBUG",
-        )
-        loguru_logger.info("✅ Loguru transcript sink installed")
-    except Exception as e:
-        logger.warning(f"⚠️ Could not install loguru sink: {e}")
+    
+    def flush(self):
+        self.original.flush()
+
+
+# Install stderr interceptor at module load time
+import sys
+if not isinstance(sys.stderr, TranscriptInterceptor):
+    sys.stderr = TranscriptInterceptor(sys.stderr)
 
 
 # ── Shared processor instance ───────────────────────────────────────────
@@ -110,9 +103,9 @@ async def create_agent(**kwargs) -> Agent:
     """Factory called by Vision Agents Runner for each new session."""
     agent = Agent(
         edge=getstream.Edge(),
-        agent_user=User(name="StepRoast AI", id="steproast-agent"),
+        agent_user=User(name="StepRoast Coach", id="steproast-agent"),
         instructions="Read @steproast_judge.md",
-        llm=gemini.Realtime(fps=5),
+        llm=gemini.Realtime(fps=10),  # 10 fps for faster real-time analysis
         processors=[],
         stt=deepgram.STT(),
         tts=elevenlabs.TTS(),
@@ -123,9 +116,6 @@ async def create_agent(**kwargs) -> Agent:
 async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> None:
     """Called when a mobile user spawns a session — agent joins the call."""
     transcript.reset()
-    
-    # Install loguru sink NOW (after SDK has set up its logging)
-    install_loguru_sink()
 
     await agent.create_user()
     call = await agent.create_call(call_type, call_id)
@@ -134,26 +124,25 @@ async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> Non
         # Kick-start Gemini with an opening prompt
         await agent.llm.simple_response(
             text=(
-                "You are StepRoast, a savage but funny AI dance judge. "
-                "You're watching a live video of someone's feet dancing. "
-                "Give a 1-sentence hype intro, then DESCRIBE what you literally see!"
+                "You are StepRoast Coach, a fun AI dance coach giving real-time feedback. "
+                "You see someone's feet dancing. Give a 1-sentence hype intro!"
             )
         )
 
-        # Keep Gemini roasting by re-prompting every 6 seconds
-        # Prompts force Gemini to describe SPECIFIC things it sees
+        # Keep Gemini coaching by re-prompting every 5 seconds
+        # Short prompts = faster Gemini output = lower latency
         async def keep_roasting():
             prompts = [
-                "DESCRIBE exactly what the feet are doing RIGHT NOW - are they moving left, right, jumping, shuffling? Give a funny 1-sentence reaction to the SPECIFIC movement you see!",
-                "What COLOR are the shoes or socks you see? Are the feet fast or slow right now? One punchy roast about what you're LITERALLY watching!",
-                "Count how many steps you just saw in the last few seconds! Are they on beat or off? React with one savage sentence!",
-                "Is the dancer's weight on their left foot or right foot RIGHT NOW? Roast their balance in one sentence!",
-                "What's the FLOOR look like? Are the feet close together or spread apart? Give a quick funny observation!",
-                "Are those feet ACTUALLY dancing or just standing there? Describe the movement speed and roast it!",
+                "How's the footwork RIGHT NOW? 1 quick sentence!",
+                "Fast or slow feet? Quick comment!",
+                "Balanced or wobbly? 1 sentence!",
+                "Which foot is leading? React!",
+                "Are they on rhythm? Quick take!",
+                "What do you see the ankles doing? 1 sentence!",
             ]
             i = 0
             while True:
-                await asyncio.sleep(6)  # Slightly faster prompting
+                await asyncio.sleep(5)  # 5 seconds between prompts
                 try:
                     prompt = prompts[i % len(prompts)]
                     await agent.llm.simple_response(text=prompt)

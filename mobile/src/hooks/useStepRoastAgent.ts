@@ -3,6 +3,7 @@ import {
     StreamVideoClient,
     Call,
 } from '@stream-io/video-react-native-sdk';
+import { StreamChat, Channel } from 'stream-chat';
 
 // Default — will be overridden at runtime via the settings input
 const DEFAULT_BACKEND_URL = 'https://orange-yodel-gjp6g6q9grr29v4w-8000.app.github.dev';
@@ -57,15 +58,23 @@ export function useStepRoastAgent() {
 
     const clientRef = useRef<StreamVideoClient | null>(null);
     const callRef = useRef<Call | null>(null);
+    const chatClientRef = useRef<StreamChat | null>(null);
+    const chatChannelRef = useRef<Channel | null>(null);
     const sessionIdRef = useRef<string | null>(null);
     const isStartingRef = useRef<boolean>(false);
     const metricsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const backendUrlRef = useRef<string>(DEFAULT_BACKEND_URL);
+    
+    // Accumulate chat fragments into complete sentences
+    const chatBufferRef = useRef<string>('');
+    const lastCompleteRef = useRef<string>('');
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (metricsIntervalRef.current) clearInterval(metricsIntervalRef.current);
+            if (chatChannelRef.current) chatChannelRef.current.stopWatching().catch(() => {});
+            if (chatClientRef.current) chatClientRef.current.disconnectUser().catch(() => {});
             if (callRef.current) callRef.current.leave().catch(() => {});
             if (clientRef.current) clientRef.current.disconnectUser().catch(() => {});
         };
@@ -79,10 +88,20 @@ export function useStepRoastAgent() {
                 const res = await fetch(`${url}/metrics`);
                 if (!res.ok) return;
                 const data: MetricsResponse = await res.json();
+                
+                // DEBUG: log what we're getting
+                console.log('[METRICS]', JSON.stringify({ commentary: data.commentary, all: data.all_commentary?.length }));
+                
                 setState(prev => {
                     const newCommentary = data.commentary && data.commentary.length > 0
                         ? `🎤 ${data.commentary}`
                         : prev.liveCommentary;
+                    
+                    // DEBUG: log state update
+                    if (newCommentary !== prev.liveCommentary) {
+                        console.log('[STATE UPDATE] liveCommentary:', newCommentary);
+                    }
+                    
                     return {
                         ...prev,
                         vibeLevel: speedToVibe(data.avg_speed),
@@ -136,6 +155,10 @@ export function useStepRoastAgent() {
         isStartingRef.current = true;
         try {
             setState(prev => ({ ...prev, error: null, liveCommentary: 'Connecting...' }));
+            
+            // Reset chat buffers for new session
+            chatBufferRef.current = '';
+            lastCompleteRef.current = '';
 
             // Fresh start
             if (clientRef.current) {
@@ -190,9 +213,57 @@ export function useStepRoastAgent() {
             const sessionData = await sessionRes.json();
             sessionIdRef.current = sessionData.session_id;
 
+            // Connect to Stream Chat to receive AI roasts
+            // (Backend posts commentary to Chat channel, not custom events)
+            try {
+                const tokenRes = await fetch(`${url}/token?user_id=mobile-dancer`);
+                const tokenData: TokenResponse = await tokenRes.json();
+                
+                const chatClient = StreamChat.getInstance(tokenData.api_key);
+                await chatClient.connectUser(
+                    { id: tokenData.user_id, name: 'Dancer' },
+                    tokenData.token
+                );
+                chatClientRef.current = chatClient;
+                
+                const channel = chatClient.channel('messaging', callId);
+                await channel.watch();
+                chatChannelRef.current = channel;
+                
+                channel.on('message.new', (event) => {
+                    const text = event.message?.text;
+                    if (text) {
+                        // Accumulate fragments into sentences
+                        chatBufferRef.current += text;
+                        const trimmed = chatBufferRef.current.trim();
+                        const wordCount = trimmed.split(/\s+/).filter(w => w.length > 0).length;
+                        const isComplete = /[.!?]$/.test(trimmed);
+                        
+                        // Show text once we have 2+ words OR sentence is complete
+                        // This gives ~1-2 sec response time instead of 6-8 sec
+                        if (wordCount >= 2 || isComplete) {
+                            const typingCursor = isComplete ? '' : ' ▌';
+                            setState(prev => ({
+                                ...prev,
+                                liveCommentary: `🎤 ${trimmed}${typingCursor}`,
+                            }));
+                        }
+                        
+                        // Reset buffer when sentence is complete
+                        if (isComplete) {
+                            lastCompleteRef.current = trimmed;
+                            chatBufferRef.current = '';
+                        }
+                    }
+                });
+                console.log('[CHAT] Listening to channel:', callId);
+            } catch (chatErr) {
+                console.warn('[CHAT] Failed to connect:', chatErr);
+            }
+
             setState(prev => ({
                 ...prev,
-                liveCommentary: '🔥 StepRoast AI is watching. DANCE!',
+                liveCommentary: '🔥 AI Coach is ready. Show me your moves!',
             }));
 
             // Reset starting flag — session is live now
@@ -232,20 +303,58 @@ export function useStepRoastAgent() {
         }
     }, [connect, startMetricsPolling]);
 
-    // ── Stop judging ───────────────────────────────────────────────────
+    // ── Stop coaching ───────────────────────────────────────────────────
+    const FAREWELL_MESSAGES = [
+        "Great session! Those feet are getting sharper. See you next time! 💪",
+        "Nice work! Keep practicing and you'll be unstoppable. 🔥",
+        "Session complete! Remember: every pro started as a beginner. Keep going! 🌟",
+        "That's a wrap! Your footwork is improving — I can tell. 👏",
+        "Good effort today! Come back tomorrow and let's level up. 📈",
+        "See you next time! Those ankles have potential. 🎯",
+        "Session ended. Keep that energy and practice makes perfect! ⚡",
+        "Until next time! The floor felt that workout. 💯",
+    ];
+
     const stopJudging = useCallback(async (backendUrl: string) => {
         try {
             stopMetricsPolling();
             isStartingRef.current = false;
 
-            // End the agent session
+            // Show farewell message immediately
+            const farewellMsg = FAREWELL_MESSAGES[Math.floor(Math.random() * FAREWELL_MESSAGES.length)];
+            setState(prev => ({
+                ...prev,
+                liveCommentary: `🎤 ${farewellMsg}`,
+            }));
+
+            // End the agent session on backend
             if (sessionIdRef.current) {
                 const url = backendUrl || backendUrlRef.current;
-                await fetch(`${url}/sessions/${sessionIdRef.current}`, {
-                    method: 'DELETE',
-                }).catch(() => {});
+                console.log('[STOP] Deleting session:', sessionIdRef.current);
+                try {
+                    const res = await fetch(`${url}/sessions/${sessionIdRef.current}`, {
+                        method: 'DELETE',
+                    });
+                    console.log('[STOP] Session DELETE response:', res.status);
+                } catch (e) {
+                    console.warn('[STOP] Session DELETE failed:', e);
+                }
                 sessionIdRef.current = null;
             }
+
+            // Disconnect from Stream Chat
+            if (chatChannelRef.current) {
+                await chatChannelRef.current.stopWatching().catch(() => {});
+                chatChannelRef.current = null;
+            }
+            if (chatClientRef.current) {
+                await chatClientRef.current.disconnectUser().catch(() => {});
+                chatClientRef.current = null;
+            }
+            
+            // Reset chat buffer
+            chatBufferRef.current = '';
+            lastCompleteRef.current = '';
 
             // Leave the call
             if (callRef.current) {
@@ -253,10 +362,10 @@ export function useStepRoastAgent() {
                 callRef.current = null;
             }
 
+            // Keep farewell showing, but mark as not judging
             setState(prev => ({
                 ...prev,
                 isJudging: false,
-                liveCommentary: 'Session ended.',
             }));
         } catch (err: any) {
             setState(prev => ({ ...prev, isJudging: false, error: err.message }));

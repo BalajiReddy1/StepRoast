@@ -9,6 +9,8 @@ import {
     TextInput,
     Alert,
     ScrollView,
+    StatusBar,
+    Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import VibeMeter from '../components/VibeMeter';
@@ -42,6 +44,8 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
     const [backendUrl, setBackendUrl] = useState(DEFAULT_BACKEND_URL);
     const [showSettings, setShowSettings] = useState(false);
     const [permission, requestPermission] = useCameraPermissions();
+    const [farewellMode, setFarewellMode] = useState(false);
+    const wasJudgingRef = useRef(false);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -75,6 +79,20 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
             }, 1000);
             return () => clearInterval(interval);
         }
+    }, [agent.isJudging]);
+
+    // Detect when judging stops → show farewell screen for 4 seconds
+    useEffect(() => {
+        if (wasJudgingRef.current && !agent.isJudging) {
+            // Just stopped judging — show farewell mode
+            setFarewellMode(true);
+            const timeout = setTimeout(() => {
+                setFarewellMode(false);
+                setElapsed(0); // Reset timer for next session
+            }, 4000);
+            return () => clearTimeout(timeout);
+        }
+        wasJudgingRef.current = agent.isJudging;
     }, [agent.isJudging]);
 
     // Show errors
@@ -125,10 +143,11 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
 
     return (
         <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
             {/* Camera preview — full screen background when judging */}
             {agent.isJudging && (
                 <CameraView
-                    style={StyleSheet.absoluteFill}
+                    style={styles.cameraFill}
                     facing="front"
                 />
             )}
@@ -200,11 +219,8 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                             </Text>
                         </View>
 
-                        {/* Stats row */}
+                        {/* Timer */}
                         <View style={styles.statsRow}>
-                            <View style={styles.stepCounter}>
-                                <Text style={styles.stepCountText}>👟 {agent.stepCount} steps</Text>
-                            </View>
                             <View style={styles.stepCounter}>
                                 <Text style={styles.stepCountText}>⏱ {formatTime(elapsed)}</Text>
                             </View>
@@ -223,14 +239,29 @@ export default function JudgeScreen({ onBack, agent }: JudgeScreenProps) {
                     </ScrollView>
                 )}
 
+                {/* Farewell screen — shows roast after stopping */}
+                {farewellMode && !agent.isJudging && (
+                    <View style={styles.farewellContent}>
+                        <Text style={styles.farewellIcon}>🎤💀</Text>
+                        <Text style={styles.farewellTitle}>SESSION OVER</Text>
+                        <View style={styles.farewellBox}>
+                            <Text style={styles.farewellText}>
+                                {agent.liveCommentary || 'Peace out, dancer!'}
+                            </Text>
+                        </View>
+                        <Text style={styles.farewellTimer}>⏱ {formatTime(elapsed)}</Text>
+                        <Text style={styles.farewellHint}>Returning to menu...</Text>
+                    </View>
+                )}
+
                 {/* Idle state */}
-                {!agent.isJudging && countdown === null && (
+                {!agent.isJudging && !farewellMode && countdown === null && (
                     <View style={styles.idleContent}>
                         <Text style={styles.cameraIcon}>📹</Text>
-                        <Text style={styles.idleTitle}>Ready to Judge</Text>
+                        <Text style={styles.idleTitle}>Ready for Coaching</Text>
                         <Text style={styles.idleHint}>
                             Place your phone on the floor with camera facing up, then hit
-                            start. The AI will watch your footwork and roast you live!
+                            start. The AI Coach will give real-time feedback on your footwork!
                         </Text>
                         <TouchableOpacity
                             style={styles.startButton}
@@ -249,6 +280,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#0a0a0a',
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    cameraFill: {
+        ...StyleSheet.absoluteFillObject,
+        top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
     },
     header: {
         flexDirection: 'row',
@@ -407,6 +443,49 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         letterSpacing: 1,
+    },
+    // Farewell screen after stopping
+    farewellContent: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    farewellIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    farewellTitle: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#e94560',
+        marginBottom: 20,
+        letterSpacing: 2,
+    },
+    farewellBox: {
+        backgroundColor: 'rgba(26, 26, 46, 0.95)',
+        borderRadius: 16,
+        padding: 24,
+        marginBottom: 20,
+        borderLeftWidth: 4,
+        borderLeftColor: '#e94560',
+        width: '100%',
+    },
+    farewellText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '600',
+        textAlign: 'center',
+        lineHeight: 26,
+    },
+    farewellTimer: {
+        color: '#888',
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    farewellHint: {
+        color: '#666',
+        fontSize: 14,
+        fontStyle: 'italic',
     },
     // Idle
     idleContent: {
