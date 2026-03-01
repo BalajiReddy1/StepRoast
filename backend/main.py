@@ -10,6 +10,7 @@ Architecture:
 """
 
 import os
+import re
 import asyncio
 import logging
 import threading
@@ -84,6 +85,8 @@ class TranscriptInterceptor:
             line, self.buffer = self.buffer.split("\n", 1)
             if "[Agent transcript]:" in line:
                 fragment = line.split("[Agent transcript]:")[-1]
+                # Strip ANSI escape codes (e.g. \x1b[0m) before storing
+                fragment = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', fragment)
                 transcript.handle_fragment(fragment)
     
     def flush(self):
