@@ -10,6 +10,7 @@ Architecture:
 """
 
 import os
+import asyncio
 import logging
 import threading
 from dotenv import load_dotenv
@@ -23,23 +24,19 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-# ── Transcript capture — intercepts agent transcript log lines ──────────
-class TranscriptCapture(logging.Handler):
-    """Captures agent transcript fragments from the SDK logger and
-    accumulates them into complete sentences for display on mobile."""
+# ── Transcript capture ──────────────────────────────────────────────────
+class TranscriptCapture:
+    """Captures agent transcript fragments and accumulates them into
+    complete sentences. Works with both loguru and standard logging."""
 
     def __init__(self):
-        super().__init__()
         self._lock = threading.Lock()
         self.current_sentence = ""
         self.latest_complete = ""
         self.all_commentary: list[str] = []
 
-    def emit(self, record):
-        msg = record.getMessage()
-        if "[Agent transcript]:" not in msg:
-            return
-        fragment = msg.split("[Agent transcript]:")[-1]
+    def handle_fragment(self, fragment: str):
+        """Process a single transcript fragment."""
         with self._lock:
             self.current_sentence += fragment
             stripped = self.current_sentence.strip()
@@ -47,13 +44,12 @@ class TranscriptCapture(logging.Handler):
             if stripped and stripped[-1] in ".!?":
                 self.latest_complete = stripped
                 self.all_commentary.append(stripped)
-                if len(self.all_commentary) > 30:
-                    self.all_commentary = self.all_commentary[-30:]
+                if len(self.all_commentary) > 50:
+                    self.all_commentary = self.all_commentary[-50:]
                 self.current_sentence = ""
 
     def get_latest(self) -> str:
         with self._lock:
-            # Return in-progress sentence if nothing complete yet
             return self.latest_complete or self.current_sentence.strip()
 
     def get_all(self) -> list[str]:
@@ -68,7 +64,36 @@ class TranscriptCapture(logging.Handler):
 
 
 transcript = TranscriptCapture()
-logging.getLogger().addHandler(transcript)
+
+# Hook into loguru (used by Vision Agents SDK for transcript logs)
+try:
+    from loguru import logger as loguru_logger
+
+    def _loguru_transcript_sink(message):
+        msg = message.record["message"]
+        if "[Agent transcript]:" in msg:
+            fragment = msg.split("[Agent transcript]:")[-1]
+            transcript.handle_fragment(fragment)
+
+    loguru_logger.add(
+        _loguru_transcript_sink,
+        level="INFO",
+        filter=lambda record: "[Agent transcript]:" in record["message"],
+    )
+    logger.info("✅ Loguru transcript capture installed")
+except ImportError:
+    logger.warning("⚠️ Loguru not available, falling back to stdlib logging")
+
+# Also hook stdlib logging as fallback
+class _StdlibTranscriptHandler(logging.Handler):
+    def emit(self, record):
+        msg = record.getMessage()
+        if "[Agent transcript]:" in msg:
+            fragment = msg.split("[Agent transcript]:")[-1]
+            transcript.handle_fragment(fragment)
+
+logging.getLogger().addHandler(_StdlibTranscriptHandler())
+
 
 # ── Shared processor instance ───────────────────────────────────────────
 footwork = FootworkProcessor()
@@ -81,8 +106,6 @@ async def create_agent(**kwargs) -> Agent:
         agent_user=User(name="StepRoast AI", id="steproast-agent"),
         instructions="Read @steproast_judge.md",
         llm=gemini.Realtime(fps=5),
-        # YOLO disabled — CPU-only Codespace can't handle 30 FPS inference
-        # Gemini Realtime sees the raw video directly and judges visually
         processors=[],
         stt=deepgram.STT(),
         tts=elevenlabs.TTS(),
@@ -92,25 +115,52 @@ async def create_agent(**kwargs) -> Agent:
 
 async def join_call(agent: Agent, call_type: str, call_id: str, **kwargs) -> None:
     """Called when a mobile user spawns a session — agent joins the call."""
-    # Reset transcript capture for the new session
     transcript.reset()
 
     await agent.create_user()
     call = await agent.create_call(call_type, call_id)
 
     async with agent.join(call):
-        # Kick-start Gemini with an opening prompt (like the golf coach example)
+        # Kick-start Gemini with an opening prompt
         await agent.llm.simple_response(
             text=(
                 "You are StepRoast, a savage but funny AI dance judge. "
-                "The camera is on the floor pointing up at the dancer's feet. "
-                "Start by greeting the dancer with a short hype intro (1 sentence). "
-                "Then watch their footwork and give SHORT, punchy, live commentary "
-                "while they dance — max 1-2 sentences per response. Be funny, not mean. "
-                "When the call is about to end, give a final score out of 100."
+                "The camera is pointing at the dancer's feet. "
+                "Start with a short hype intro (1 sentence), then keep watching."
             )
         )
-        await agent.finish()
+
+        # Keep Gemini roasting by re-prompting every 8 seconds
+        # (Gemini Realtime uses turn-taking — without this it goes silent)
+        async def keep_roasting():
+            prompts = [
+                "Look at the dancer's feet RIGHT NOW and give a quick 1-sentence roast or compliment about their current footwork.",
+                "Judge the dancer's current moves. One punchy sentence — be funny!",
+                "What are those feet doing? Quick reaction, 1 sentence max!",
+                "Rate the energy level of the footwork you see right now. One sentence!",
+                "Give a savage but playful comment about the dance moves you're watching.",
+                "Quick! Roast or praise the footwork happening right now. Keep it short!",
+            ]
+            i = 0
+            while True:
+                await asyncio.sleep(8)
+                try:
+                    prompt = prompts[i % len(prompts)]
+                    await agent.llm.simple_response(text=prompt)
+                    i += 1
+                except Exception as e:
+                    logger.warning(f"Re-prompt failed: {e}")
+                    break
+
+        roast_task = asyncio.create_task(keep_roasting())
+        try:
+            await agent.finish()
+        finally:
+            roast_task.cancel()
+            try:
+                await roast_task
+            except asyncio.CancelledError:
+                pass
 
 
 # ── Runner / FastAPI ────────────────────────────────────────────────────────
