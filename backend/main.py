@@ -84,11 +84,8 @@ def install_loguru_sink():
             # Use str(message) to get full formatted log line
             msg = str(message)
             if "[Agent transcript]:" in msg:
-                # Extract fragment after the marker
-                fragment = msg.split("[Agent transcript]:")[-1].strip()
-                # Remove trailing newline if present
-                if fragment.endswith("\n"):
-                    fragment = fragment[:-1]
+                # Extract fragment after the marker (keep leading space for word separation!)
+                fragment = msg.split("[Agent transcript]:")[-1].rstrip('\n')
                 transcript.handle_fragment(fragment)
         
         _loguru_sink_id = loguru_logger.add(
