@@ -176,13 +176,21 @@ stream_client = Stream(
 @runner.fast_api.get("/token")
 async def get_token(user_id: str = "mobile-user"):
     """Generate a Stream user token for the mobile app."""
-    stream_client.create_user(name="Dancer", id=user_id)
-    token = stream_client.create_token(user_id, expiration=3600)
-    return {
-        "token": token,
-        "user_id": user_id,
-        "api_key": os.getenv("STREAM_API_KEY"),
-    }
+    try:
+        api_key = os.getenv("STREAM_API_KEY")
+        if not api_key:
+            return {"error": "STREAM_API_KEY not set", "token": None, "user_id": user_id}
+        
+        stream_client.create_user(name="Dancer", id=user_id)
+        token = stream_client.create_token(user_id, expiration=3600)
+        return {
+            "token": token,
+            "user_id": user_id,
+            "api_key": api_key,
+        }
+    except Exception as e:
+        logger.error(f"Token generation failed: {e}")
+        return {"error": str(e), "token": None, "user_id": user_id}
 
 
 @runner.fast_api.get("/metrics")
